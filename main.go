@@ -402,6 +402,16 @@ func init() {
 	}
 }
 
+var viaString string = "WJQSERVER-STUDIO/GHProxy"
+
+func viaHeader() app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		protoVersion := "1.1"
+		c.Header("Via", protoVersion+" "+viaString)
+		c.Next(ctx)
+	}
+}
+
 func main() {
 	if showVersion || showHelp {
 		return
@@ -420,12 +430,14 @@ func main() {
 				server.WithH2C(true),
 				server.WithHostPorts(addr),
 				server.WithTransport(standard.NewTransporter),
+				server.WithStreamBody(true),
 			)
 			r.AddProtocol("h2", factory.NewServerFactory())
 		} else {
 			r = server.New(
 				server.WithHostPorts(addr),
 				server.WithTransport(standard.NewTransporter),
+				server.WithStreamBody(true),
 			)
 		}
 	} else if cfg.Server.NetLib == "netpoll" || cfg.Server.NetLib == "" {
@@ -434,12 +446,14 @@ func main() {
 				server.WithH2C(true),
 				server.WithHostPorts(addr),
 				server.WithSenseClientDisconnection(cfg.Server.SenseClientDisconnection),
+				server.WithStreamBody(true),
 			)
 			r.AddProtocol("h2", factory.NewServerFactory())
 		} else {
 			r = server.New(
 				server.WithHostPorts(addr),
 				server.WithSenseClientDisconnection(cfg.Server.SenseClientDisconnection),
+				server.WithStreamBody(true),
 			)
 		}
 	} else {
@@ -450,6 +464,7 @@ func main() {
 
 	r.Use(recovery.Recovery()) // Recovery中间件
 	r.Use(loggin.Middleware()) // log中间件
+	r.Use(viaHeader())
 	setupApi(cfg, r, version)
 	setupPages(cfg, r)
 
@@ -492,7 +507,7 @@ func main() {
 		proxy.NoRouteHandler(cfg, limiter, iplimiter)(ctx, c)
 	})
 
-	r.GET("/api.github.com/repos/:user/:repo/*filepath", func(ctx context.Context, c *app.RequestContext) {
+	r.Any("/api.github.com/repos/:user/:repo/*filepath", func(ctx context.Context, c *app.RequestContext) {
 		c.Set("matcher", "api")
 		proxy.RoutingHandler(cfg, limiter, iplimiter)(ctx, c)
 	})
