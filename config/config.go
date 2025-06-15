@@ -26,6 +26,7 @@ type Config struct {
 host = "0.0.0.0"
 port = 8080
 netlib = "netpoll" # "netpoll" / "std" "standard" "net/http" "net"
+goPoolSize = 1024
 sizeLimit = 125 # MB
 memLimit = 0 # MB
 H2C = true
@@ -38,6 +39,7 @@ type ServerConfig struct {
 	Host                     string `toml:"host"`
 	NetLib                   string `toml:"netlib"`
 	SenseClientDisconnection bool   `toml:"senseClientDisconnection"`
+	GoPoolSize               int    `toml:"goPoolSize"`
 	SizeLimit                int    `toml:"sizeLimit"`
 	MemLimit                 int64  `toml:"memLimit"`
 	H2C                      bool   `toml:"H2C"`
@@ -110,15 +112,17 @@ Key = ""
 Token = "token"
 enabled = false
 passThrough = false
-ForceAllowApi = true
+ForceAllowApi = false
+ForceAllowApiPassList = false
 */
 type AuthConfig struct {
-	Enabled       bool   `toml:"enabled"`
-	Method        string `toml:"method"`
-	Key           string `toml:"key"`
-	Token         string `toml:"token"`
-	PassThrough   bool   `toml:"passThrough"`
-	ForceAllowApi bool   `toml:"ForceAllowApi"`
+	Enabled               bool   `toml:"enabled"`
+	Method                string `toml:"method"`
+	Key                   string `toml:"key"`
+	Token                 string `toml:"token"`
+	PassThrough           bool   `toml:"passThrough"`
+	ForceAllowApi         bool   `toml:"ForceAllowApi"`
+	ForceAllowApiPassList bool   `toml:"ForceAllowApiPassList"`
 }
 
 type BlacklistConfig struct {
@@ -222,14 +226,15 @@ func FileExists(filename string) bool {
 func DefaultConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
-			Port:      8080,
-			Host:      "0.0.0.0",
-			NetLib:    "netpoll",
-			SizeLimit: 125,
-			MemLimit:  0,
-			H2C:       true,
-			Cors:      "*",
-			Debug:     false,
+			Port:       8080,
+			Host:       "0.0.0.0",
+			NetLib:     "netpoll",
+			GoPoolSize: 1024,
+			SizeLimit:  125,
+			MemLimit:   0,
+			H2C:        true,
+			Cors:       "*",
+			Debug:      false,
 		},
 		Httpc: HttpcConfig{
 			Mode:                "auto",
@@ -258,12 +263,13 @@ func DefaultConfig() *Config {
 			HertZLogPath: "/data/ghproxy/log/hertz.log",
 		},
 		Auth: AuthConfig{
-			Enabled:       false,
-			Method:        "parameters",
-			Key:           "",
-			Token:         "token",
-			PassThrough:   false,
-			ForceAllowApi: false,
+			Enabled:               false,
+			Method:                "parameters",
+			Key:                   "",
+			Token:                 "token",
+			PassThrough:           false,
+			ForceAllowApi:         false,
+			ForceAllowApiPassList: false,
 		},
 		Blacklist: BlacklistConfig{
 			Enabled:       false,

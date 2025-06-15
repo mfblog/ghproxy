@@ -1,5 +1,84 @@
 # 更新日志
 
+3.5.6 - 2025-06-15
+---
+- FIX: 修正blob重写的生成问题
+- CHANGE: 改进302重定向逻辑
+
+25w48c - 2025-06-15
+---
+- PRE-RELEASE: 此版本是v3.5.6预发布版本,请勿在生产环境中使用;
+- CHANGE: 加入内部301处理
+
+25w48b - 2025-06-15
+---
+- PRE-RELEASE: 此版本是v3.5.6预发布版本,请勿在生产环境中使用;
+- FIX: 修正blob重写的生成问题
+- CHANGE: 验证与连接释放相关的修正
+
+25w48a - 2025-06-14
+---
+- PRE-RELEASE: 此版本是v3.5.6预发布版本,请勿在生产环境中使用;
+- CHANGE: 测试302重定向逻辑
+
+3.5.5 - 2025-06-14
+---
+- CHANGE: 修正新匹配器的覆盖问题, 同时增加test的覆盖
+
+25w47a - 2025-06-14
+---
+- PRE-RELEASE: 此版本是v3.5.5预发布版本,请勿在生产环境中使用;
+- CHANGE: 修正新匹配器的覆盖问题, 同时增加test的覆盖
+
+3.5.4 - 2025-06-14
+---
+- CHANGE: 移植来自于[GHProxy-Touka](https://github.com/WJQSERVER-STUDIO/ghproxy-touka)的blob处理逻辑与302处理逻辑
+
+25w46c - 2025-06-14
+---
+- PRE-RELEASE: 此版本是v3.5.4预发布版本,请勿在生产环境中使用;
+- CHANGE: 移植来自于[GHProxy-Touka](https://github.com/WJQSERVER-STUDIO/ghproxy-touka)的blob处理逻辑与302处理逻辑
+
+25w46b - 2025-06-14
+---
+- PRE-RELEASE: 此版本是v3.5.4预发布版本,请勿在生产环境中使用;
+- CHANGE: 修改关闭行为以测试问题
+
+25w46a - 2025-06-14
+---
+- PRE-RELEASE: 此版本是v3.5.4预发布版本,请勿在生产环境中使用;
+- CHANGE: 修改payload行为以测试问题
+
+3.5.3 - 2025-06-13
+---
+- CHANGE: 显式配置`WithStreamBody(true)`
+
+3.5.2 - 2025-06-11
+---
+- CHANGE: 加入MPL 2.0许可证, 项目转为双重许可
+
+3.5.1 - 2025-06-09
+---
+- CHANGE: 大幅优化`Matcher`的性能, 实现零分配, 大幅提升性能; 单次操作时间: `254.3 ns/op` => `29.59 ns/op`
+
+25w45a - 2025-06-09
+---
+- PRE-RELEASE: 此版本是v3.5.1预发布版本,请勿在生产环境中使用;
+- CHANGE: 大幅优化`Matcher`的性能, 实现零分配, 大幅提升性能; 单次操作时间: `254.3 ns/op` => `29.59 ns/op`
+
+3.5.0 - 2025-06-05
+---
+- CHANGE: 更新许可证 v2.0 => v2.1
+- CHANGE: 修正工作流的一些问题
+- ADD: 增加`ForceAllowApiPassList`, 实现 #114
+
+25w44a - 2025-06-05
+---
+- PRE-RELEASE: 此版本是v3.5.0预发布版本,请勿在生产环境中使用;
+- CHANGE: 更新许可证 v2.0 => v2.1
+- CHANGE: 修正工作流的一些问题
+- ADD: 增加`ForceAllowApiPassList`, 实现 #114
+
 3.4.3 - 2025-06-05
 ---
 - CHANGE: 弃用`adaptor.GetCompatRequest`, 切换到`adaptor.HertzHandler`

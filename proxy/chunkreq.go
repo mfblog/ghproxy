@@ -23,16 +23,18 @@ func ChunkedProxyRequest(ctx context.Context, c *app.RequestContext, u string, c
 	go func() {
 		<-ctx.Done()
 		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
+			err := resp.Body.Close()
+			if err != nil {
+				logError("Failed to close response body: %v", err)
+			}
 		}
-		if req != nil {
-			req.Body.Close()
-		}
+		c.Abort()
 	}()
 
 	rb := client.NewRequestBuilder(string(c.Request.Method()), u)
 	rb.NoDefaultHeaders()
-	rb.SetBody(c.Request.BodyStream())
+	//rb.SetBody(bytes.NewBuffer(c.Request.Body()))
+	rb.SetBody(c.RequestBodyStream())
 	rb.WithContext(ctx)
 
 	req, err = rb.Build()
@@ -54,6 +56,21 @@ func ChunkedProxyRequest(ctx context.Context, c *app.RequestContext, u string, c
 	if resp.StatusCode == 404 {
 		ErrorPage(c, NewErrorWithStatusLookup(404, "Page Not Found (From Github)"))
 		return
+	}
+
+	// 处理302情况
+	if resp.StatusCode == 302 || resp.StatusCode == 301 {
+		finalURL := resp.Header.Get("Location")
+		if finalURL != "" {
+			err = resp.Body.Close()
+			if err != nil {
+				logError("Failed to close response body: %v", err)
+			}
+			c.Request.Header.Del("Referer")
+			logInfo("Internal Redirecting to %s", finalURL)
+			ChunkedProxyRequest(ctx, c, finalURL, cfg, matcher)
+			return
+		}
 	}
 
 	var (
@@ -110,7 +127,7 @@ func ChunkedProxyRequest(ctx context.Context, c *app.RequestContext, u string, c
 		bodyReader = limitreader.NewRateLimitedReader(bodyReader, bandwidthLimit, int(bandwidthBurst), ctx)
 	}
 
-	if MatcherShell(u) && matchString(matcher, matchedMatchers) && cfg.Shell.Editor {
+	if MatcherShell(u) && matchString(matcher) && cfg.Shell.Editor {
 		// 判断body是不是gzip
 		var compress string
 		if resp.Header.Get("Content-Encoding") == "gzip" {
@@ -136,6 +153,7 @@ func ChunkedProxyRequest(ctx context.Context, c *app.RequestContext, u string, c
 			return
 		}
 		c.SetBodyStream(bodyReader, -1)
+		bodyReader.Close()
 	}
 
 }
