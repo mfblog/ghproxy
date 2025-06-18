@@ -9,10 +9,10 @@ import (
 	"strconv"
 
 	"github.com/WJQSERVER-STUDIO/go-utils/limitreader"
-	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/infinite-iroha/touka"
 )
 
-func ChunkedProxyRequest(ctx context.Context, c *app.RequestContext, u string, cfg *config.Config, matcher string) {
+func ChunkedProxyRequest(ctx context.Context, c *touka.Context, u string, cfg *config.Config, matcher string) {
 
 	var (
 		req  *http.Request
@@ -25,14 +25,14 @@ func ChunkedProxyRequest(ctx context.Context, c *app.RequestContext, u string, c
 		if resp != nil && resp.Body != nil {
 			resp.Body.Close()
 		}
-		if req != nil {
+		if req != nil && req.Body != nil {
 			req.Body.Close()
 		}
 	}()
 
-	rb := client.NewRequestBuilder(string(c.Request.Method()), u)
+	rb := client.NewRequestBuilder(c.Request.Method, u)
 	rb.NoDefaultHeaders()
-	rb.SetBody(c.Request.BodyStream())
+	rb.SetBody(c.Request.Body)
 	rb.WithContext(ctx)
 
 	req, err = rb.Build()
@@ -56,6 +56,23 @@ func ChunkedProxyRequest(ctx context.Context, c *app.RequestContext, u string, c
 		return
 	}
 
+	// 处理302情况
+	if resp.StatusCode == 302 || resp.StatusCode == 301 {
+		//c.Debugf("resp header %s", resp.Header)
+		finalURL := resp.Header.Get("Location")
+		if finalURL != "" {
+			err = resp.Body.Close()
+			if err != nil {
+				c.Errorf("Failed to close response body: %v", err)
+			}
+			c.Infof("Internal Redirecting to %s", finalURL)
+			ChunkedProxyRequest(ctx, c, finalURL, cfg, matcher)
+			return
+		}
+	}
+
+	// 处理响应体大小限制
+
 	var (
 		bodySize      int
 		contentLength string
@@ -67,28 +84,25 @@ func ChunkedProxyRequest(ctx context.Context, c *app.RequestContext, u string, c
 		var err error
 		bodySize, err = strconv.Atoi(contentLength)
 		if err != nil {
-			logWarning("%s %s %s %s %s Content-Length header is not a valid integer: %v", c.ClientIP(), c.Method(), c.Path(), c.UserAgent(), c.Request.Header.GetProtocol(), err)
+			c.Warnf("%s %s %s %s %s Content-Length header is not a valid integer: %v", c.ClientIP(), c.Request.Method, c.Request.URL.Path, c.UserAgent(), c.Request.Proto, err)
 			bodySize = -1
 		}
 		if err == nil && bodySize > sizelimit {
 			finalURL := resp.Request.URL.String()
 			err = resp.Body.Close()
 			if err != nil {
-				logError("Failed to close response body: %v", err)
+				c.Errorf("Failed to close response body: %v", err)
 			}
-			c.Redirect(301, []byte(finalURL))
-			logWarning("%s %s %s %s %s Final-URL: %s Size-Limit-Exceeded: %d", c.ClientIP(), c.Method(), c.Path(), c.UserAgent(), c.Request.Header.GetProtocol(), finalURL, bodySize)
+			c.Redirect(301, finalURL)
+			c.Warnf("%s %s %s %s %s Final-URL: %s Size-Limit-Exceeded: %d", c.ClientIP(), c.Request.Method, c.Request.URL.Path, c.UserAgent(), c.Request.Proto, finalURL, bodySize)
 			return
 		}
 	}
 
 	// 复制响应头，排除需要移除的 header
-	for key, values := range resp.Header {
-		if _, shouldRemove := respHeadersToRemove[key]; !shouldRemove {
-			for _, value := range values {
-				c.Header(key, value)
-			}
-		}
+	c.SetHeaders(resp.Header)
+	for key := range respHeadersToRemove {
+		c.DelHeader(key)
 	}
 
 	switch cfg.Server.Cors {
@@ -110,32 +124,35 @@ func ChunkedProxyRequest(ctx context.Context, c *app.RequestContext, u string, c
 		bodyReader = limitreader.NewRateLimitedReader(bodyReader, bandwidthLimit, int(bandwidthBurst), ctx)
 	}
 
-	if MatcherShell(u) && matchString(matcher, matchedMatchers) && cfg.Shell.Editor {
+	defer bodyReader.Close()
+
+	if MatcherShell(u) && matchString(matcher) && cfg.Shell.Editor {
 		// 判断body是不是gzip
 		var compress string
 		if resp.Header.Get("Content-Encoding") == "gzip" {
 			compress = "gzip"
 		}
 
-		logDebug("Use Shell Editor: %s %s %s %s %s", c.ClientIP(), c.Request.Method(), u, c.Request.Header.Get("User-Agent"), c.Request.Header.GetProtocol())
+		c.Debugf("Use Shell Editor: %s %s %s %s %s", c.ClientIP(), c.Request.Method, u, c.UserAgent(), c.Request.Proto)
 		c.Header("Content-Length", "")
 
 		var reader io.Reader
 
-		reader, _, err = processLinks(bodyReader, compress, string(c.Request.Host()), cfg)
-		c.SetBodyStream(reader, -1)
+		reader, _, err = processLinks(bodyReader, compress, c.Request.Host, cfg, c)
+		c.WriteStream(reader)
 		if err != nil {
-			logError("%s %s %s %s %s Failed to copy response body: %v", c.ClientIP(), c.Request.Method(), u, c.Request.Header.Get("User-Agent"), c.Request.Header.GetProtocol(), err)
+			c.Errorf("%s %s %s %s %s Failed to copy response body: %v", c.ClientIP(), c.Request.Method, u, c.UserAgent(), c.Request.Proto, err)
 			ErrorPage(c, NewErrorWithStatusLookup(500, fmt.Sprintf("Failed to copy response body: %v", err)))
 			return
 		}
 	} else {
 
 		if contentLength != "" {
-			c.SetBodyStream(bodyReader, bodySize)
+			c.SetHeader("Content-Length", contentLength)
+			c.WriteStream(bodyReader)
 			return
 		}
-		c.SetBodyStream(bodyReader, -1)
+		c.WriteStream(bodyReader)
 	}
 
 }
